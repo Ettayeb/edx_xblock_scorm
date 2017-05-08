@@ -26,6 +26,13 @@ class ScormXBlock(XBlock):
         default="Scorm",
         scope=Scope.settings,
     )
+    subdomain = String(
+        display_name=_("Subdomain"),
+        help=_("write your subdomain name here"),
+        default="",
+        scope=Scope.settings,
+    )
+
     scorm_file = String(
         display_name=_("Upload scorm file"),
         scope=Scope.settings,
@@ -110,6 +117,7 @@ class ScormXBlock(XBlock):
     @XBlock.handler
     def studio_submit(self, request, suffix=''):
         self.display_name = request.params['display_name']
+        self.subdomain = request.params['subdomain']
         self.has_score = request.params['has_score']
         self.icon_class = 'problem' if self.has_score == 'True' else 'video'
         if hasattr(request.params['file'], 'file'):
@@ -198,6 +206,8 @@ class ScormXBlock(XBlock):
         return {
             'field_display_name': self.fields['display_name'],
             'display_name_value': self.display_name,
+            'subdomain': self.fields['subdomain'],
+            'subdomain_value': self.subdomain,
             'field_scorm_file': self.fields['scorm_file'],
             'field_has_score': self.fields['has_score'],
             'has_score_value': self.has_score
@@ -207,8 +217,10 @@ class ScormXBlock(XBlock):
         scorm_file_path = ''
         if self.scorm_file:
             scheme = 'https' if settings.HTTPS == 'on' else 'http'
-            scorm_file_path = '{}://{}{}'.format(scheme, settings.ENV_TOKENS.get('LMS_BASE'), self.scorm_file)
-
+	    if self.subdomain != "":
+            	scorm_file_path = '{}://{}{}'.format(scheme,self.subdomain + "." + settings.ENV_TOKENS.get('LMS_BASE'), self.scorm_file)
+	    else:
+		scorm_file_path = '{}://{}{}'.format(scheme ,settings.ENV_TOKENS.get('LMS_BASE'), self.scorm_file)
         return {
             'scorm_file_path': scorm_file_path,
             'lesson_score': self.lesson_score,
@@ -223,7 +235,7 @@ class ScormXBlock(XBlock):
         return template.render(Context(context))
 
     def set_fields_xblock(self, path_to_file):
-        path_index_page = 'index.html'
+        path_index_page = 'story.html'
         try:
             tree = ET.parse('{}/imsmanifest.xml'.format(path_to_file))
         except IOError:
@@ -243,8 +255,8 @@ class ScormXBlock(XBlock):
                 resource = root.find('resources/resource')
                 schemaversion = root.find('metadata/schemaversion')
 
-            if resource:
-                path_index_page = resource.get('href')
+#            if resource:
+#                path_index_page = resource.get('href')
 
             if (not schemaversion is None) and (re.match('^1.2$', schemaversion.text) is None):
                 self.version_scorm = 'SCORM_2004'
